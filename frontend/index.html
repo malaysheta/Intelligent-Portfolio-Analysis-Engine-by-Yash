@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intelligent Portfolio Analysis Engine — By Yash</title>
+  <meta name="description" content="AI-powered portfolio analysis with live Yahoo Finance data, ML predictions, Monte Carlo simulation, and portfolio optimization. Built by Yash.">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+</head>
+<body>
+
+<!-- ══ PARTICLE CANVAS ═══════════════════════════════════════ -->
+<canvas id="particleCanvas"></canvas>
+
+<!-- ══ HEADER ════════════════════════════════════════════════ -->
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">PortfolioML</div>
+        <div class="logo-sub">Intelligent Analysis Engine</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-badge">
+        <div class="status-dot"></div>
+        Yahoo Finance Live
+      </div>
+      <div class="header-author">By <span>Yash</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ══ HERO ══════════════════════════════════════════════════ -->
+<div class="container">
+  <div class="hero">
+    <div class="hero-label">
+      <div class="hero-label-dot"></div>
+      AI-Powered · Real-Time · Quantitative
+    </div>
+    <h1>Intelligent Portfolio<br><span class="hero-accent">Analysis Engine</span></h1>
+    <p class="hero-byline">By <strong>Yash</strong></p>
+    <p class="hero-desc">Select any global stocks, set your investment horizon and weights, then let our ML models optimise and predict your portfolio performance.</p>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-icon">🤖</div>
+        <div>
+          <div class="hero-stat-val">ML Powered</div>
+          <div class="hero-stat-label">Random Forest · SVM · NN</div>
+        </div>
+      </div>
+      <div class="hero-stat-sep"></div>
+      <div class="hero-stat">
+        <div class="hero-stat-icon">🌐</div>
+        <div>
+          <div class="hero-stat-val">Global Markets</div>
+          <div class="hero-stat-label">NYSE · NASDAQ · NSE · BSE</div>
+        </div>
+      </div>
+      <div class="hero-stat-sep"></div>
+      <div class="hero-stat">
+        <div class="hero-stat-icon">⚡</div>
+        <div>
+          <div class="hero-stat-val">Monte Carlo</div>
+          <div class="hero-stat-label">Up to 20,000 simulations</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CONFIG PANEL ══════════════════════════════════════ -->
+  <div class="config-section">
+
+    <!-- STEP 1: Stock Selection -->
+    <div class="card step-card">
+      <div class="card-title">
+        <div class="step-badge">1</div>
+        Stock Selection
+        <div class="card-title-sub">Search any global exchange</div>
+      </div>
+
+      <div class="search-wrap">
+        <label for="stockSearch">Search Stocks (any global exchange)</label>
+        <div class="search-input-wrap">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input type="text" id="stockSearch" placeholder="e.g. Apple, RELIANCE.NS, TSLA, INFY…" autocomplete="off">
+        </div>
+        <div class="search-dropdown" id="searchDropdown"></div>
+        <div class="search-hint">Supports NYSE, NASDAQ, NSE (add .NS), BSE (add .BO), LSE, etc.</div>
+      </div>
+
+      <div class="selected-stocks" id="selectedStocks"></div>
+      <div id="noStocksHint" class="no-stocks-hint">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+        No stocks selected yet. Start typing above to search.
+      </div>
+    </div>
+
+    <!-- STEP 2: Date Range -->
+    <div class="card step-card">
+      <div class="card-title">
+        <div class="step-badge">2</div>
+        Investment Horizon
+        <div class="card-title-sub">Historical data range</div>
+      </div>
+      <div class="config-grid">
+        <div>
+          <label for="startDate">Start Date</label>
+          <input type="date" id="startDate" value="2021-01-01">
+        </div>
+        <div>
+          <label for="endDate">End Date</label>
+          <input type="date" id="endDate" value="2024-12-31">
+        </div>
+      </div>
+      <div id="dateHint" class="search-hint">
+        ⓘ Minimum 3 months of data recommended for reliable ML predictions.
+      </div>
+    </div>
+
+    <!-- STEP 3: Weights & Parameters -->
+    <div class="card step-card">
+      <div class="card-title">
+        <div class="step-badge">3</div>
+        Portfolio Weights &amp; Parameters
+        <div class="card-title-sub">Configure allocation</div>
+      </div>
+
+      <div class="weights-section" id="weightsSection">
+        <div class="weights-header">
+          <label style="margin:0;">Allocation Weights</label>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button class="normalize-btn" id="normalizeBtn" onclick="normalizeWeights()">⚖ Auto-Normalize</button>
+            <div class="weight-total ok" id="weightTotal">100.0%</div>
+          </div>
+        </div>
+        <div id="weightSliders">
+          <div style="color:var(--text-muted);font-size:0.8rem;">Select stocks first to configure weights.</div>
+        </div>
+      </div>
+
+      <div class="params-row">
+        <div>
+          <label for="riskFreeRate">Risk-Free Rate (%)</label>
+          <input type="number" id="riskFreeRate" value="5.0" min="0" max="20" step="0.1">
+        </div>
+        <div>
+          <label for="nSimulations">Monte Carlo Simulations</label>
+          <input type="number" id="nSimulations" value="5000" min="1000" max="20000" step="1000">
+        </div>
+        <div>
+          <label for="nSynthetic">ML Synthetic Samples</label>
+          <input type="number" id="nSynthetic" value="3000" min="500" max="10000" step="500">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RUN BUTTON ══════════════════════════════════════════ -->
+  <button class="run-btn" id="runBtn" onclick="runAnalysis()">
+    <span class="run-btn-glow"></span>
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+      <polygon points="5,3 19,12 5,21"/>
+    </svg>
+    Run Portfolio Analysis
+  </button>
+
+  <!-- Progress -->
+  <div class="progress-bar-wrap" id="progressWrap">
+    <div class="progress-label">
+      <span id="progressLabel">Fetching market data…</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="errorBox">
+    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span id="errorMsg">An error occurred.</span>
+  </div>
+
+  <!-- ══ RESULTS ═════════════════════════════════════════════ -->
+  <div id="results">
+
+    <!-- Info Strip -->
+    <div class="info-strip" id="infoStrip"></div>
+
+    <!-- Current Portfolio Metrics -->
+    <div class="section-title">
+      <div class="icon" style="background:rgba(99,179,255,0.12);">📊</div>
+      Current Portfolio Performance
+    </div>
+    <div class="metrics-grid" id="metricsGrid"></div>
+
+    <!-- Asset Returns -->
+    <div class="section-title">
+      <div class="icon" style="background:rgba(167,139,250,0.12);">📋</div>
+      Asset Return Summary
+    </div>
+    <div class="table-wrap" id="assetTable"></div>
+
+    <!-- Optimization -->
+    <div class="section-title">
+      <div class="icon" style="background:rgba(74,222,128,0.12);">⚡</div>
+      Portfolio Optimization Strategies
+    </div>
+    <div class="table-wrap" id="optTable"></div>
+
+    <!-- ML Predictions -->
+    <div class="section-title">
+      <div class="icon" style="background:rgba(245,200,66,0.12);">🤖</div>
+      ML Model Predictions (Next Period)
+    </div>
+    <div class="table-wrap" id="mlTable"></div>
+
+    <!-- Charts -->
+    <div class="section-title">
+      <div class="icon" style="background:rgba(99,179,255,0.12);">📈</div>
+      Visualizations
+    </div>
+
+    <div class="chart-grid-3">
+      <div class="chart-card">
+        <div class="chart-card-title">🎯 Monte Carlo Efficient Frontier</div>
+        <canvas id="efChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title">🥧 Optimal Portfolio Weights</div>
+        <canvas id="pieChart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-grid" style="margin-top:20px;">
+      <div class="chart-card">
+        <div class="chart-card-title">📉 Normalized Price History (Base=100)</div>
+        <canvas id="priceChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title">🌡 Correlation Heatmap</div>
+        <canvas id="corrChart"></canvas>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <div class="chart-card">
+        <div class="chart-card-title">⚖ Strategy Weight Comparison</div>
+        <canvas id="strategyChart" style="max-height:280px;"></canvas>
+      </div>
+    </div>
+
+  </div>
+  <!-- /results -->
+
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">
+      <div class="logo-icon" style="width:28px;height:28px;font-size:14px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+        </svg>
+      </div>
+      <span>Intelligent Portfolio Analysis Engine</span>
+    </div>
+    <p>Powered by Yahoo Finance · scikit-learn · scipy · Chart.js &mdash; Built with ❤ by <strong>Yash</strong></p>
+  </div>
+</footer>
+
+<script src="/static/app.js"></script>
+<script>
+/* ── Particle Canvas ─────────────────────────────────── */
+(function() {
+  const canvas = document.getElementById('particleCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function Particle() {
+    this.x  = Math.random() * W;
+    this.y  = Math.random() * H;
+    this.r  = Math.random() * 1.5 + 0.3;
+    this.vx = (Math.random() - 0.5) * 0.3;
+    this.vy = (Math.random() - 0.5) * 0.3;
+    this.alpha = Math.random() * 0.5 + 0.1;
+  }
+
+  Particle.prototype.update = function() {
+    this.x += this.vx; this.y += this.vy;
+    if (this.x < 0) this.x = W;
+    if (this.x > W) this.x = 0;
+    if (this.y < 0) this.y = H;
+    if (this.y > H) this.y = 0;
+  };
+
+  function init() {
+    particles = [];
+    const count = Math.floor((W * H) / 12000);
+    for (let i = 0; i < count; i++) particles.push(new Particle());
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(p => {
+      p.update();
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(99,179,255,${p.alpha})`;
+      ctx.fill();
+    });
+    // draw connecting lines
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 120) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(99,179,255,${0.06 * (1 - dist/120)})`;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); init(); });
+  resize();
+  init();
+  draw();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# outputs/ directory placeholder
+# Generated files will appear here after running main.py:
+#   - efficient_frontier.png
+#   - risk_return.png
+#   - correlation_heatmap.png
+#   - covariance_heatmap.png
+#   - predictions.csv
