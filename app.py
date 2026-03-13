@@ -259,6 +259,12 @@ def run_analysis():
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+
+@app.route("/health")
+def health():
+    return "ok", 200
+
+
 if __name__ == "__main__":
     import os
     import sys
