@@ -260,10 +260,14 @@ def run_analysis():
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    import os
     import sys
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    port = int(os.environ.get("PORT", 5000))
+    host = os.environ.get("HOST", "0.0.0.0")
     print("\n" + "=" * 55)
     print("  Portfolio ML -- Web Server")
-    print("  http://localhost:5000")
+    print(f"  http://{host}:{port}")
     print("=" * 55 + "\n")
-    app.run(debug=True, port=5000, use_reloader=False)
+    app.run(debug=True, host=host, port=port, use_reloader=False)
