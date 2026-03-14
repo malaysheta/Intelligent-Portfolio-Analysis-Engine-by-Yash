@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Intelligent Portfolio Analysis Engine — By Yash Bhalani</title>
   <meta name="description" content="AI-powered portfolio analysis with live Yahoo Finance data, ML predictions, Monte Carlo simulation, and portfolio optimization. Built by Yash Bhalani.">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 </head>
@@ -136,6 +136,15 @@
         <div class="card-title-sub">Configure allocation</div>
       </div>
 
+      <div class="amount-input-section">
+        <label for="investmentAmount">💰 Total Investment Amount</label>
+        <div class="amount-input-wrap">
+          <span class="amount-currency">₹</span>
+          <input type="number" id="investmentAmount" value="100000" min="0" step="1000" placeholder="e.g. 100000" oninput="onAmountChange()">
+        </div>
+        <div class="search-hint">Enter your total investment to see how it splits across stocks.</div>
+      </div>
+
       <div class="weights-section" id="weightsSection">
         <div class="weights-header">
           <label style="margin:0;">Allocation Weights</label>
@@ -199,6 +208,14 @@
 
     <!-- Info Strip -->
     <div class="info-strip" id="infoStrip"></div>
+
+    <!-- Investment P&L Summary -->
+    <div class="section-title">
+      <div class="icon" style="background:rgba(74,222,128,0.12);">💰</div>
+      Investment P&amp;L Summary
+    </div>
+    <div class="pnl-overall-cards" id="pnlOverallCards"></div>
+    <div class="table-wrap" id="pnlTable" style="margin-top:16px;"></div>
 
     <!-- Current Portfolio Metrics -->
     <div class="section-title">
@@ -282,7 +299,7 @@
   </div>
 </footer>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=2"></script>
 <script>
 /* ── Particle Canvas ─────────────────────────────────── */
 (function() {

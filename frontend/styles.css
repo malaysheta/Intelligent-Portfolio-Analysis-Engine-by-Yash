@@ -533,7 +533,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .weight-row {
   display: grid;
-  grid-template-columns: 90px 1fr 70px;
+  grid-template-columns: 90px 1fr 70px 110px;
   align-items: center;
   gap: 14px;
   margin-bottom: 14px;
@@ -588,6 +588,129 @@ input[type="range"]::-webkit-slider-thumb:hover {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
   margin-top: 20px;
+}
+
+/* ── Amount Input ─────────────────────────────────────────── */
+.amount-input-section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.amount-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.amount-currency {
+  position: absolute;
+  left: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gold);
+  pointer-events: none;
+  z-index: 1;
+}
+
+#investmentAmount {
+  padding-left: 36px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* ── Split Amount (beside sliders) ────────────────────────── */
+.split-amount {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--green);
+  text-align: right;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+/* ── P&L Cards ─────────────────────────────────────────────── */
+.pnl-overall-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.pnl-card {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.pnl-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--cyan), var(--purple));
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.pnl-card:hover { border-color: var(--border-glow); }
+.pnl-card:hover::before { opacity: 1; }
+
+.pnl-profit::before { background: linear-gradient(90deg, var(--green), #34d399); opacity: 1; }
+.pnl-loss::before   { background: linear-gradient(90deg, var(--red), #fb923c);   opacity: 1; }
+
+.pnl-profit { border-color: rgba(74,222,128,0.25); }
+.pnl-loss   { border-color: rgba(248,113,113,0.25); }
+
+.pnl-card-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.pnl-card-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.pnl-card-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+/* ── P&L Badges ────────────────────────────────────────────── */
+.pnl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.pnl-badge-profit {
+  background: var(--green-glow);
+  border: 1px solid rgba(74,222,128,0.3);
+}
+
+.pnl-badge-loss {
+  background: rgba(248,113,113,0.1);
+  border: 1px solid rgba(248,113,113,0.3);
 }
 
 /* ── Run Button ───────────────────────────────────────────── */

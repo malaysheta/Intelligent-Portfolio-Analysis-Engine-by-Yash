@@ -32,8 +32,13 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_absolute_percentage_error,
+    mean_squared_error,
+    r2_score,
+)
 from sklearn.preprocessing import StandardScaler
 
 from src.portfolio_metrics import (
@@ -54,7 +59,9 @@ class MLResults:
 
     predictions: pd.DataFrame
     train_metrics: dict[str, dict[str, dict[str, float]]] = field(default_factory=dict)
+    cv_metrics: dict[str, dict[str, dict[str, float]]] = field(default_factory=dict)
     # predictions columns: model, predicted_return, predicted_std, predicted_sharpe
+    # cv_metrics structure: {label_col: {model_name: {mae_mean, mae_std, rmse_mean, ...}}}
 
 
 # ─── Synthetic dataset generation ────────────────────────────────────────────
@@ -128,6 +135,58 @@ def _build_features_labels(
     return X, y
 
 
+# ─── Cross-validation helper ─────────────────────────────────────────────────
+
+def _run_cross_validation(
+    X: np.ndarray,
+    y: np.ndarray,
+    model,
+    n_folds: int = 5,
+    random_state: int = 42,
+) -> dict[str, float]:
+    """
+    Run K-Fold cross-validation and compute MAE, RMSE, MSE, R², and MAPE.
+
+    Returns a dict with keys like 'mae_mean', 'mae_std', 'rmse_mean', etc.
+    """
+    from sklearn.base import clone
+
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
+    scaler = StandardScaler()
+
+    fold_metrics: dict[str, list[float]] = {
+        "mae": [], "rmse": [], "mse": [], "r2": [], "mape": [],
+    }
+
+    for train_idx, val_idx in kf.split(X):
+        X_tr, X_val = X[train_idx], X[val_idx]
+        y_tr, y_val = y[train_idx], y[val_idx]
+
+        X_tr_s = scaler.fit_transform(X_tr)
+        X_val_s = scaler.transform(X_val)
+
+        m = clone(model)
+        m.fit(X_tr_s, y_tr)
+        y_pred = m.predict(X_val_s)
+
+        fold_metrics["mae"].append(mean_absolute_error(y_val, y_pred))
+        fold_metrics["mse"].append(mean_squared_error(y_val, y_pred))
+        fold_metrics["rmse"].append(float(np.sqrt(mean_squared_error(y_val, y_pred))))
+        fold_metrics["r2"].append(r2_score(y_val, y_pred))
+        # Guard MAPE against near-zero actuals
+        try:
+            fold_metrics["mape"].append(mean_absolute_percentage_error(y_val, y_pred))
+        except Exception:
+            fold_metrics["mape"].append(float("nan"))
+
+    result: dict[str, float] = {}
+    for metric_name, values in fold_metrics.items():
+        arr = np.array(values)
+        result[f"{metric_name}_mean"] = float(np.nanmean(arr))
+        result[f"{metric_name}_std"] = float(np.nanstd(arr))
+    return result
+
+
 # ─── Training & prediction ────────────────────────────────────────────────────
 
 def train_and_predict(
@@ -138,6 +197,7 @@ def train_and_predict(
     n_samples: int = 5000,
     test_size: float = 0.20,
     random_state: int = 42,
+    n_cv_folds: int = 5,
     output_path: Path | None = None,
 ) -> MLResults:
     """
@@ -196,6 +256,9 @@ def train_and_predict(
     train_metrics: dict[str, dict[str, dict[str, float]]] = {
         label: {name: {} for name in models} for label in targets
     }
+    cv_metrics: dict[str, dict[str, dict[str, float]]] = {
+        label: {name: {} for name in models} for label in targets
+    }
 
     scaler = StandardScaler()
 
@@ -216,12 +279,19 @@ def train_and_predict(
             r2 = r2_score(y_test, y_pred_test)
             train_metrics[label_col][model_name] = {"mse": mse, "r2": r2}
 
+            # ── Cross-validation ──────────────────────────────────────
+            cv_result = _run_cross_validation(
+                X, y, model, n_folds=n_cv_folds, random_state=random_state
+            )
+            cv_metrics[label_col][model_name] = cv_result
+
             pred_val = float(model.predict(base_s)[0])
             results[model_name][pred_name] = pred_val
 
             logger.info(
-                "  [%s → %s] R²=%.4f  MSE=%.6f  Prediction=%.6f",
-                model_name, pred_name, r2, mse, pred_val,
+                "  [%s → %s] R²=%.4f  MSE=%.6f  CV-MAE=%.6f  Prediction=%.6f",
+                model_name, pred_name, r2, mse,
+                cv_result["mae_mean"], pred_val,
             )
 
     # ── Build predictions DataFrame ──────────────────────────────────────
@@ -240,4 +310,8 @@ def train_and_predict(
         predictions_df.to_csv(output_path, index=False)
         logger.info("Predictions saved to '%s'.", output_path)
 
-    return MLResults(predictions=predictions_df, train_metrics=train_metrics)
+    return MLResults(
+        predictions=predictions_df,
+        train_metrics=train_metrics,
+        cv_metrics=cv_metrics,
+    )

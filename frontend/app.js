@@ -9,6 +9,7 @@ const state = {
   selectedStocks: [],   // [{symbol, name, exchange}]
   weights: {},          // {symbol: 0-100 (percent)}
   charts: {},           // Chart.js instances (keyed by canvas id)
+  investmentAmount: 100000,  // total investment amount
 };
 
 /* ── DOM Refs ─────────────────────────────────────────────────── */
@@ -152,9 +153,11 @@ function renderSliders() {
     return;
   }
 
+  const amt = state.investmentAmount || 0;
   container.innerHTML = state.selectedStocks.map((stock, i) => {
     const w = state.weights[stock.symbol] ?? (100 / state.selectedStocks.length);
     const color = PALETTE[i % PALETTE.length];
+    const splitAmt = (w / 100) * amt;
     return `
       <div class="weight-row">
         <div class="weight-label" style="color:${color}" title="${escHtml(stock.symbol)}">${escHtml(stock.symbol)}</div>
@@ -163,6 +166,7 @@ function renderSliders() {
                oninput="onSliderChange('${stock.symbol}', this.value)"
                style="accent-color: ${color}">
         <div class="weight-value" id="wval_${stock.symbol}">${w.toFixed(1)}%</div>
+        <div class="split-amount" id="split_${stock.symbol}">₹${formatCurrency(splitAmt)}</div>
       </div>
     `;
   }).join('');
@@ -172,7 +176,17 @@ function renderSliders() {
 function onSliderChange(sym, val) {
   state.weights[sym] = parseFloat(val);
   document.getElementById(`wval_${sym}`).textContent = parseFloat(val).toFixed(1) + '%';
+  const amt = state.investmentAmount || 0;
+  const splitAmt = (parseFloat(val) / 100) * amt;
+  const splitEl = document.getElementById(`split_${sym}`);
+  if (splitEl) splitEl.textContent = '₹' + formatCurrency(splitAmt);
   updateWeightTotal();
+}
+
+function onAmountChange() {
+  const el = document.getElementById('investmentAmount');
+  state.investmentAmount = parseFloat(el.value) || 0;
+  renderSliders();
 }
 
 function updateWeightTotal() {
@@ -276,6 +290,7 @@ async function runAnalysis() {
 
 function renderResults(d) {
   renderInfoStrip(d);
+  renderPnLSection(d.stocks, d.current_portfolio);
   renderMetrics(d.current_portfolio);
   renderAssetTable(d.stocks, d.current_portfolio);
   renderOptTable(d.optimization, d.current_portfolio, d.stocks);
@@ -303,7 +318,7 @@ function renderMetrics(cp) {
   const grid = document.getElementById('metricsGrid');
   const cards = [
     { label:'Portfolio Return (Ann.)', value: pct(cp.return), cls:'', sub: 'Annualised expected return' },
-    { label:'Portfolio Risk (Std Dev)', value: pct(cp.std),   cls:'', sub: 'Annualised standard deviation' },
+    { label:'Portfolio Risk (Std Dev)', value: fmt4(cp.std/100),   cls:'', sub: 'Annualised standard deviation' },
     { label:'Portfolio Variance',       value: fmt4(cp.variance), cls:'green', sub: 'σ² = wᵀ Σ w' },
     { label:'Sharpe Ratio',            value: fmt3(cp.sharpe), cls: cp.sharpe > 1 ? 'green' : cp.sharpe > 0.5 ? 'gold' : '', sub: 'Risk-adjusted return' },
   ];
@@ -378,16 +393,82 @@ function renderMLTable(preds) {
     wrap.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:0.85rem;">ML predictions not available (insufficient data).</div>';
     return;
   }
-  const rows = preds.map(p => `<tr>
+
+  // Predictions table
+  const predRows = preds.map(p => `<tr>
     <td style="font-weight:600;color:var(--purple)">${escHtml(p.model)}</td>
     <td class="mono">${pct(p.return)}</td>
     <td class="mono">${pct(p.std)}</td>
     <td class="mono" style="color:var(--gold)">${fmt3(p.sharpe)}</td>
   </tr>`).join('');
-  wrap.innerHTML = `<table>
+  let html = `<table>
     <thead><tr><th>Model</th><th>Pred. Return</th><th>Pred. Risk</th><th>Pred. Sharpe</th></tr></thead>
-    <tbody>${rows}</tbody>
+    <tbody>${predRows}</tbody>
   </table>`;
+
+  // Cross-Validation metrics table (if available)
+  const hasCV = preds.some(p => p.cv_metrics && Object.keys(p.cv_metrics).length > 0);
+  if (hasCV) {
+    const metricNames = [
+      { key: 'mae',  label: 'MAE' },
+      { key: 'rmse', label: 'RMSE' },
+      { key: 'mse',  label: 'MSE' },
+      { key: 'r2',   label: 'R²' },
+      { key: 'mape', label: 'MAPE' },
+    ];
+    const targetNames = [
+      { key: 'return', label: 'Return' },
+      { key: 'std',    label: 'Risk' },
+      { key: 'sharpe', label: 'Sharpe' },
+    ];
+
+    html += `<div style="margin-top:18px;">
+      <div style="font-weight:600;color:var(--text-secondary);font-size:0.85rem;margin-bottom:8px;letter-spacing:0.5px;">
+        📊 5-FOLD CROSS-VALIDATION METRICS <span style="font-weight:400;color:var(--text-muted)">(mean ± std)</span>
+      </div>`;
+
+    preds.forEach(p => {
+      if (!p.cv_metrics) return;
+      html += `<div style="margin-bottom:14px;">
+        <div style="font-weight:600;color:var(--purple);font-size:0.82rem;margin-bottom:4px;">${escHtml(p.model)}</div>
+        <table style="font-size:0.8rem;">
+          <thead><tr><th style="min-width:65px;">Metric</th>`;
+      targetNames.forEach(t => {
+        html += `<th>${t.label}</th>`;
+      });
+      html += `</tr></thead><tbody>`;
+
+      metricNames.forEach(m => {
+        html += `<tr><td style="font-weight:600;color:var(--text-secondary)">${m.label}</td>`;
+        targetNames.forEach(t => {
+          const cv = p.cv_metrics[t.key] || {};
+          const mean = cv[m.key + '_mean'];
+          const std = cv[m.key + '_std'];
+          if (mean !== undefined && mean !== null && !isNaN(mean)) {
+            const isR2 = m.key === 'r2';
+            const isMAPE = m.key === 'mape';
+            let valStr;
+            if (isR2) {
+              valStr = `<span style="color:${mean > 0.9 ? 'var(--green,#4ade80)' : mean > 0.7 ? 'var(--gold,#f5c842)' : 'var(--red,#f87171)'}">${mean.toFixed(4)}</span>`;
+            } else if (isMAPE) {
+              valStr = `${(mean * 100).toFixed(2)}%`;
+            } else {
+              valStr = mean.toFixed(6);
+            }
+            const stdStr = std !== undefined ? ` <span style="color:var(--text-muted);font-size:0.75rem;">± ${isMAPE ? (std*100).toFixed(2)+'%' : isR2 ? std.toFixed(4) : std.toFixed(6)}</span>` : '';
+            html += `<td class="mono">${valStr}${stdStr}</td>`;
+          } else {
+            html += `<td class="mono" style="color:var(--text-muted)">—</td>`;
+          }
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody></table></div>`;
+    });
+    html += `</div>`;
+  }
+
+  wrap.innerHTML = html;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -700,6 +781,94 @@ function fmt3(v) {
 function fmt4(v) {
   if (v === null || v === undefined || isNaN(v)) return '—';
   return parseFloat(v).toFixed(5);
+}
+
+function formatCurrency(v) {
+  if (v === null || v === undefined || isNaN(v)) return '0';
+  return Number(v).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INVESTMENT P&L
+   ═══════════════════════════════════════════════════════════════ */
+
+function renderPnLSection(stocks, cp) {
+  const totalInvested = state.investmentAmount || 0;
+  const cardsEl = document.getElementById('pnlOverallCards');
+  const tableEl = document.getElementById('pnlTable');
+
+  if (!totalInvested || totalInvested <= 0) {
+    cardsEl.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:0.85rem;">Enter a Total Investment Amount in Step 3 to see P&L breakdown.</div>';
+    tableEl.innerHTML = '';
+    return;
+  }
+
+  // Per-stock P&L
+  let totalCurrentValue = 0;
+  const stockPnL = stocks.map((s, i) => {
+    const weight = cp.weights[s] ?? 0;
+    const annReturn = cp.asset_returns[s] ?? 0;
+    const invested = weight * totalInvested;
+    const currentVal = invested * (1 + annReturn);
+    const pnl = currentVal - invested;
+    const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+    totalCurrentValue += currentVal;
+    return { symbol: s, invested, currentVal, pnl, pnlPct, color: PALETTE[i % PALETTE.length] };
+  });
+
+  const overallPnL = totalCurrentValue - totalInvested;
+  const overallPnLPct = totalInvested > 0 ? (overallPnL / totalInvested) * 100 : 0;
+
+  // Overall summary cards
+  const isProfit = overallPnL >= 0;
+  cardsEl.innerHTML = `
+    <div class="pnl-card">
+      <div class="pnl-card-label">Total Invested</div>
+      <div class="pnl-card-value" style="color:var(--cyan);">₹${formatCurrency(totalInvested)}</div>
+    </div>
+    <div class="pnl-card">
+      <div class="pnl-card-label">Current Value</div>
+      <div class="pnl-card-value" style="color:var(--purple);">₹${formatCurrency(totalCurrentValue)}</div>
+    </div>
+    <div class="pnl-card ${isProfit ? 'pnl-profit' : 'pnl-loss'}">
+      <div class="pnl-card-label">Overall P&L</div>
+      <div class="pnl-card-value ${isProfit ? 'green' : ''}" style="color:${isProfit ? 'var(--green)' : 'var(--red)'}">
+        ${isProfit ? '+' : ''}₹${formatCurrency(Math.abs(overallPnL))}
+      </div>
+      <div class="pnl-card-sub" style="color:${isProfit ? 'var(--green)' : 'var(--red)'}">
+        ${isProfit ? '▲' : '▼'} ${Math.abs(overallPnLPct).toFixed(2)}%
+      </div>
+    </div>
+  `;
+
+  // Per-stock table
+  const rows = stockPnL.map(s => {
+    const isUp = s.pnl >= 0;
+    return `<tr>
+      <td><span style="color:${s.color};font-weight:600;font-family:'JetBrains Mono',monospace">${escHtml(s.symbol)}</span></td>
+      <td class="mono">₹${formatCurrency(s.invested)}</td>
+      <td class="mono">₹${formatCurrency(s.currentVal)}</td>
+      <td class="mono" style="color:${isUp ? 'var(--green)' : 'var(--red)'}">
+        ${isUp ? '+' : ''}₹${formatCurrency(Math.abs(s.pnl))}
+      </td>
+      <td class="mono" style="color:${isUp ? 'var(--green)' : 'var(--red)'}">
+        <span class="pnl-badge ${isUp ? 'pnl-badge-profit' : 'pnl-badge-loss'}">
+          ${isUp ? '▲' : '▼'} ${Math.abs(s.pnlPct).toFixed(2)}%
+        </span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  tableEl.innerHTML = `<table>
+    <thead><tr>
+      <th>Stock</th>
+      <th>Invested</th>
+      <th>Current Value</th>
+      <th>P&L Amount</th>
+      <th>P&L %</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
 /* ── Set today as maxDate for date pickers ─────────────────── */

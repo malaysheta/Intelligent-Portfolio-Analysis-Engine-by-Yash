@@ -161,15 +161,29 @@ def run_analysis():
                 n_samples=n_synthetic,
                 test_size=0.20,
                 random_state=42,
+                n_cv_folds=5,
                 output_path=predictions_csv,
             )
             ml_preds = []
             for _, row in ml_results.predictions.iterrows():
+                model_name = str(row["Model"])
+                # Gather CV metrics for this model across all targets
+                model_cv = {}
+                for label_col, pred_name in [
+                    ("label_return", "return"),
+                    ("label_std", "std"),
+                    ("label_sharpe", "sharpe"),
+                ]:
+                    cv_data = ml_results.cv_metrics.get(label_col, {}).get(model_name, {})
+                    model_cv[pred_name] = {
+                        k: _safe_float(v) for k, v in cv_data.items()
+                    }
                 ml_preds.append({
-                    "model":  str(row["Model"]),
+                    "model":  model_name,
                     "return": _safe_float(row["Predicted_Return"]),
                     "std":    _safe_float(row["Predicted_Std"]),
                     "sharpe": _safe_float(row["Predicted_Sharpe"]),
+                    "cv_metrics": model_cv,
                 })
         except Exception as ml_err:
             logger.warning("ML prediction failed: %s", ml_err)
@@ -247,7 +261,7 @@ def run_analysis():
         }
 
         return app.response_class(
-            response=json.dumps(result, cls=_NpEncoder),
+            response=json.dumps(result, cls=_NpEncoder, allow_nan=False),
             status=200,
             mimetype="application/json",
         )

@@ -148,6 +148,9 @@ def fetch_portfolio_data(
         # Compute daily log returns
         daily_returns = np.log(prices / prices.shift(1)).dropna()
 
+        if len(daily_returns) < 2:
+            raise ValueError("Insufficient overlapping historical data for these stocks in the selected date range.")
+
         # Annualised mean returns
         ann_returns = daily_returns.mean() * TRADING_DAYS  # Series
 
@@ -183,7 +186,12 @@ def fetch_portfolio_data(
         port_std = float(np.sqrt(max(port_var, 0)))
 
         # Price history for chart (normalised to 100)
-        price_norm = (prices / prices.iloc[0] * 100).reset_index()
+        try:
+            base_prices = prices.bfill().iloc[0]
+            price_norm = (prices / base_prices * 100).reset_index()
+            price_norm = price_norm.where(pd.notnull(price_norm), None)  # Ensure NaN -> None
+        except Exception:
+            price_norm = prices.reset_index().where(pd.notnull(prices.reset_index()), None)
 
         # Convert to JSON-friendly format
         price_history = price_norm.rename(columns={"Date": "date"}).to_dict(orient="records")

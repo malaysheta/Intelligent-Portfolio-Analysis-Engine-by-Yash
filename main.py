@@ -210,6 +210,34 @@ def main() -> None:
             f"{row_data['Predicted_Sharpe']:>13.5f}"
         )
 
+    # ── Cross-Validation Metrics ─────────────────────────────────────────
+    if ml_results.cv_metrics:
+        _section("5-Fold Cross-Validation Metrics (mean ± std)")
+        target_labels = {
+            "label_return": "Return",
+            "label_std":    "Std Dev",
+            "label_sharpe": "Sharpe",
+        }
+        metric_keys = ["mae", "rmse", "mse", "r2", "mape"]
+        metric_labels = ["MAE", "RMSE", "MSE", "R²", "MAPE"]
+
+        for label_col, tgt_name in target_labels.items():
+            print(f"\n    {DIM}Target: {tgt_name}{RESET}")
+            print(f"    {'Model':<22} ", end="")
+            for ml in metric_labels:
+                print(f"{ml:>20} ", end="")
+            print()
+            print(f"    {'─'*22} " + " ".join(["─"*20] * len(metric_keys)))
+
+            model_data = ml_results.cv_metrics.get(label_col, {})
+            for model_name, cv_vals in model_data.items():
+                print(f"    {model_name:<22} ", end="")
+                for mk in metric_keys:
+                    m = cv_vals.get(f"{mk}_mean", float("nan"))
+                    s = cv_vals.get(f"{mk}_std", float("nan"))
+                    print(f"{GREEN}{m:>9.6f}{RESET} ± {DIM}{s:<8.6f}{RESET} ", end="")
+                print()
+
     # ── 6. MONTE CARLO SIMULATION ────────────────────────────────────────────
     _header("Stage 6: Monte Carlo Simulation", CYAN)
     mc_results = run_monte_carlo(
